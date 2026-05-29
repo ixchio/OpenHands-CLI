@@ -15,6 +15,10 @@ from openhands_cli.stores.cli_settings import (
     CliSettings,
     CriticSettings,
 )
+from openhands_cli.stores.prompt_history import (
+    PromptHistoryEntry,
+    PromptHistoryStore,
+)
 
 
 __all__ = [
@@ -29,6 +33,8 @@ __all__ = [
     "ENV_LLM_BASE_URL",
     "ENV_LLM_MODEL",
     "MissingEnvironmentVariablesError",
+    "PromptHistoryEntry",
+    "PromptHistoryStore",
     "check_and_warn_env_vars",
     "is_aws_auth_model",
 ]
