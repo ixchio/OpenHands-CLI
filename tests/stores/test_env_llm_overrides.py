@@ -8,9 +8,6 @@ from pydantic import SecretStr
 
 from openhands.sdk import LLM
 from openhands_cli.stores.agent_store import (
-    ENV_AWS_ACCESS_KEY_ID,
-    ENV_AWS_REGION_NAME,
-    ENV_AWS_SECRET_ACCESS_KEY,
     ENV_LLM_API_KEY,
     ENV_LLM_BASE_URL,
     ENV_LLM_MODEL,
@@ -710,13 +707,13 @@ class TestMissingEnvironmentVariablesError:
         assert "Missing required environment variable(s)" in error_str
 
     def test_aws_model_error_message(self) -> None:
-        """Error for AWS model should mention AWS credential chain."""
+        """Error for AWS model should mention SDK credential handling."""
         error = MissingEnvironmentVariablesError([ENV_LLM_MODEL], is_aws_model=True)
         error_str = str(error)
 
         assert ENV_LLM_MODEL in error_str
         assert "AWS credentials" in error_str
-        assert "credential chain" in error_str
+        assert "LLM_AWS_*" in error_str
         # Should NOT mention LLM_API_KEY as required for AWS models
         assert "LLM_API_KEY: Your LLM API key" not in error_str
 
@@ -757,27 +754,8 @@ class TestIsAwsAuthModel:
         assert is_aws_auth_model(model) is True
 
 
-class TestLLMEnvOverridesWithAwsCredentials:
-    """Tests for LLMEnvOverrides with AWS credentials."""
-
-    def test_aws_credentials_loaded_from_env(self) -> None:
-        """AWS credentials should be loaded from environment variables."""
-        env_vars = {
-            ENV_LLM_MODEL: "bedrock/anthropic.claude-3",
-            ENV_AWS_ACCESS_KEY_ID: "test-access-key",
-            ENV_AWS_SECRET_ACCESS_KEY: "test-secret-key",
-            ENV_AWS_REGION_NAME: "us-west-2",
-        }
-        with patch.dict(os.environ, env_vars, clear=False):
-            overrides = LLMEnvOverrides.from_env(enabled=True)
-            assert overrides.model == "bedrock/anthropic.claude-3"
-            assert overrides.aws_access_key_id is not None
-            assert overrides.aws_access_key_id.get_secret_value() == "test-access-key"
-            assert overrides.aws_secret_access_key is not None
-            assert (
-                overrides.aws_secret_access_key.get_secret_value() == "test-secret-key"
-            )
-            assert overrides.aws_region_name == "us-west-2"
+class TestLLMEnvOverridesWithAwsModels:
+    """Tests for LLMEnvOverrides with AWS-authenticated models."""
 
     def test_aws_model_without_api_key_passes_validation(self) -> None:
         """AWS model should not require LLM_API_KEY."""
@@ -798,18 +776,6 @@ class TestLLMEnvOverridesWithAwsCredentials:
         with pytest.raises(MissingEnvironmentVariablesError) as exc_info:
             overrides.require_for_headless()
         assert ENV_LLM_API_KEY in exc_info.value.missing_vars
-
-    def test_has_overrides_with_aws_credentials(self) -> None:
-        """has_overrides should return True when AWS credentials are set."""
-        overrides = LLMEnvOverrides(
-            aws_access_key_id=SecretStr("key"),
-        )
-        assert overrides.has_overrides() is True
-
-        overrides2 = LLMEnvOverrides(
-            aws_region_name="us-west-2",
-        )
-        assert overrides2.has_overrides() is True
 
 
 class TestAgentStoreWithAwsModels:
@@ -849,8 +815,8 @@ class TestAgentStoreWithAwsModels:
             # api_key should be None for bedrock model
             assert agent.llm.api_key is None
 
-    def test_agent_created_with_aws_credentials(self, tmp_path) -> None:
-        """Agent should be created with explicit AWS credentials."""
+    def test_agent_created_with_sdk_aws_env_vars(self, tmp_path) -> None:
+        """Agent should be created with SDK-supported AWS env vars."""
         from openhands_cli.stores import AgentStore
 
         conversations_dir = tmp_path / "conversations"
@@ -858,9 +824,9 @@ class TestAgentStoreWithAwsModels:
 
         env_vars = {
             ENV_LLM_MODEL: "bedrock/anthropic.claude-3-sonnet",
-            ENV_AWS_ACCESS_KEY_ID: "test-access-key",
-            ENV_AWS_SECRET_ACCESS_KEY: "test-secret-key",
-            ENV_AWS_REGION_NAME: "us-west-2",
+            "LLM_AWS_ACCESS_KEY_ID": "test-access-key",
+            "LLM_AWS_SECRET_ACCESS_KEY": "test-secret-key",
+            "LLM_AWS_REGION_NAME": "us-west-2",
         }
 
         with (
@@ -881,7 +847,6 @@ class TestAgentStoreWithAwsModels:
 
             assert agent is not None
             assert agent.llm.model == "bedrock/anthropic.claude-3-sonnet"
-            # AWS credentials are stored as SecretStr in the SDK's LLM class
             assert agent.llm.aws_access_key_id is not None
             assert isinstance(agent.llm.aws_access_key_id, SecretStr)
             assert agent.llm.aws_access_key_id.get_secret_value() == "test-access-key"
