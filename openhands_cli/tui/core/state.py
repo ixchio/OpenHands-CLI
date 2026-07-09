@@ -45,7 +45,7 @@ from openhands_cli.shared import extract_conversation_summary
 from openhands_cli.stores import CriticSettings
 
 
-# Agent operating mode: "plan" focuses on generating PLAN.md without code execution
+# Agent operating mode: "plan" focuses on read-only planning without code execution
 # "code" is the default mode for normal code-writing and execution
 AgentMode = Literal["plan", "code"]
 
@@ -162,6 +162,7 @@ class ConversationContainer(Container):
         # Store the user's confirmation policy before plan mode overrides it.
         # None means plan mode hasn't overridden the policy.
         self._pre_plan_confirmation_policy: ConfirmationPolicyBase | None = None
+        self._code_mode_notice_pending = False
 
         super().__init__(id="conversation_state", **kwargs)
 
@@ -406,7 +407,7 @@ class ConversationContainer(Container):
         """Set the agent operating mode. Thread-safe.
 
         Args:
-            mode: 'plan' for planning-only mode (generates PLAN.md),
+            mode: 'plan' for read-only planning mode,
                   'code' for normal code execution mode.
         """
         self._schedule_update("agent_mode", mode)
@@ -457,6 +458,20 @@ class ConversationContainer(Container):
         """Check if a pre-plan confirmation policy is saved."""
         return self._pre_plan_confirmation_policy is not None
 
+    def mark_code_mode_notice_pending(self) -> None:
+        """Mark that the next user message should tell the agent code mode resumed."""
+        self._code_mode_notice_pending = True
+
+    def clear_code_mode_transition_notice(self) -> None:
+        """Clear any pending code-mode transition notice."""
+        self._code_mode_notice_pending = False
+
+    def consume_code_mode_transition_notice(self) -> bool:
+        """Return and clear whether the next user message needs code-mode context."""
+        pending = self._code_mode_notice_pending
+        self._code_mode_notice_pending = False
+        return pending
+
     def reset_conversation_state(self) -> None:
         """Reset state for a new conversation.
 
@@ -474,8 +489,11 @@ class ConversationContainer(Container):
         self.conversation_title = None
         self.pending_action_count = 0
         self.refinement_iteration = 0
+        if self._pre_plan_confirmation_policy is not None:
+            self.confirmation_policy = self._pre_plan_confirmation_policy
         self.agent_mode = "code"
         self.switch_confirmation_target = None
         self._conversation_start_time = None
         self._conversation_state = None
         self._pre_plan_confirmation_policy = None
+        self._code_mode_notice_pending = False

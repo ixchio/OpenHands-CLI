@@ -48,7 +48,7 @@ class TestCommands:
         [
             ("/help", "Display available commands"),
             ("/new", "Start a new conversation"),
-            ("/plan", "Switch to Planning Mode (generate PLAN.md)"),
+            ("/plan", "Switch to Planning Mode (create an Agent Plan)"),
             ("/code", "Switch to Code Mode (normal execution)"),
             ("/history", "Toggle conversation history"),
             ("/settings", "Open settings"),

@@ -290,6 +290,16 @@ class ConversationManager(Container):
     def _on_set_confirmation_policy(self, event: SetConfirmationPolicy) -> None:
         """Handle request to change confirmation policy."""
         event.stop()
+        if self._state.agent_mode == "plan":
+            self._state.save_pre_plan_policy(event.policy)
+            self._policy_service.set_policy(AlwaysConfirm())
+            self.notify(
+                "Confirmation policy saved for Code Mode. "
+                "Planning Mode still requires every action to be approved.",
+                severity="information",
+            )
+            return
+
         self._policy_service.set_policy(event.policy)
 
     @on(SetAgentMode)
@@ -320,23 +330,25 @@ class ConversationManager(Container):
             # Even if the agent ignores prompt instructions, the user still
             # gets a confirmation dialog before any action executes.
             if not self._state.has_pre_plan_policy:
-                self._state.save_pre_plan_policy(
-                    self._state.confirmation_policy
-                )
+                self._state.save_pre_plan_policy(self._state.confirmation_policy)
+            self._state.clear_code_mode_transition_notice()
             self._policy_service.set_policy(AlwaysConfirm())
             self._state.set_agent_mode("plan")
             self.notify(
-                "Planning Mode — all actions require your approval",
+                "Planning Mode - all actions require your approval",
                 severity="information",
             )
         else:
             # Restore the user's previous confirmation policy
+            was_plan_mode = self._state.agent_mode == "plan"
             saved_policy = self._state.restore_pre_plan_policy()
             if saved_policy is not None:
                 self._policy_service.set_policy(saved_policy)
             self._state.set_agent_mode("code")
+            if was_plan_mode:
+                self._state.mark_code_mode_notice_pending()
             self.notify(
-                "Code Mode — confirmation policy restored",
+                "Code Mode - confirmation policy restored",
                 severity="information",
             )
 

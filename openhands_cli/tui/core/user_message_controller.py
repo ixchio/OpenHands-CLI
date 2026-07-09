@@ -13,10 +13,6 @@ if TYPE_CHECKING:
     from openhands_cli.tui.core.state import ConversationContainer
 
 
-# Planning mode instructions prepended to user messages when in plan mode.
-# These work in tandem with AlwaysConfirm policy — the prompt guides the agent
-# toward planning behavior, while AlwaysConfirm provides a hard safety net
-# requiring user approval before any action executes.
 PLANNING_MODE_INSTRUCTIONS = """
 <PLANNING_MODE>
 You are currently in PLANNING MODE. This is a read-only mode.
@@ -26,12 +22,12 @@ STRICTLY FORBIDDEN actions:
 - DO NOT use FileWriteAction or FileEditAction (file modifications)
 - DO NOT use BrowseInteractiveAction
 - DO NOT execute, compile, or run any code
-- The ONLY file you may create or edit is PLAN.md in the workspace root
+- DO NOT create or edit repository files
 
 Your role in this mode:
 1. Ask clarifying questions to understand requirements fully
 2. Analyze the existing codebase using read-only tools (file reading, search)
-3. Create a structured PLAN.md with:
+3. Use the task_tracker tool to create or update the Agent Plan with:
    - Problem statement and requirements
    - Proposed approach and architecture
    - Step-by-step implementation plan
@@ -43,6 +39,16 @@ Your role in this mode:
 IMPORTANT: Even if the user asks you to "just do it" or "go ahead," stay in
 planning mode. They must explicitly use /code to enable execution.
 </PLANNING_MODE>
+
+User's request:
+"""
+
+CODE_MODE_INSTRUCTIONS = """
+<CODE_MODE>
+Planning mode is now disabled. You may proceed with implementation and code
+changes for the user's request. Use the existing plan as context, but do not
+continue following the previous planning-only restriction.
+</CODE_MODE>
 
 User's request:
 """
@@ -93,8 +99,8 @@ class UserMessageController:
         """Apply mode-specific instructions to the message content.
 
         In planning mode, prepends instructions that guide the agent to focus
-        on understanding requirements and generating a PLAN.md file instead
-        of executing code.
+        on understanding requirements and updating the Agent Plan instead of
+        executing code.
 
         Args:
             content: The original user message content.
@@ -104,6 +110,11 @@ class UserMessageController:
         """
         if self._state.agent_mode == "plan":
             return f"{PLANNING_MODE_INSTRUCTIONS}{content}"
+        consume_code_notice = getattr(
+            self._state, "consume_code_mode_transition_notice", None
+        )
+        if callable(consume_code_notice) and consume_code_notice() is True:
+            return f"{CODE_MODE_INSTRUCTIONS}{content}"
         return content
 
     async def handle_refinement_message(self, content: str) -> None:

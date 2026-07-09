@@ -108,7 +108,7 @@ class WorkingStatusLine(Static):
         """
         if self.agent_mode == "plan":
             # Use accent color (#277dff) for planning mode - matches GUI blue
-            return "[bold #277dff]📋 Planning Mode[/bold #277dff]"
+            return "[bold #277dff]Planning Mode[/bold #277dff]"
         return ""
 
     def _update_text(self) -> None:

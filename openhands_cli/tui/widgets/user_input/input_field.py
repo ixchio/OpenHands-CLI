@@ -105,7 +105,7 @@ class InputField(Container):
     agent_mode: reactive[str] = reactive("code")
 
     # Color constants for mode indication
-    CODE_MODE_BORDER = "#ffe165"  # Primary/logo color (yellow)
+    CODE_MODE_BORDER = "#fee165"  # Primary/logo color (yellow)
     PLAN_MODE_BORDER = "#277dff"  # Accent color (blue)
 
     DEFAULT_CSS = """
@@ -121,11 +121,10 @@ class InputField(Container):
             max-height: 8;
             background: $background;
             color: $foreground;
-            border: round $primary !important;
+            border: round #fee165;
         }
 
         #single_line_input:focus {
-            border: round $primary !important;
             background: $background;
         }
 
@@ -134,12 +133,11 @@ class InputField(Container):
             height: 6;
             background: $background;
             color: $foreground;
-            border: round $primary;
+            border: round #fee165;
             display: none;
         }
 
         #multiline_input:focus {
-            border: round $primary;
             background: $background;
         }
     }
@@ -188,6 +186,7 @@ class InputField(Container):
 
     def on_mount(self) -> None:
         """Focus the input when mounted."""
+        self._update_border_color()
         self.focus_input()
 
     def watch_conversation_id(self, conversation_id: uuid.UUID | None) -> None:
@@ -211,7 +210,7 @@ class InputField(Container):
     def _update_border_color(self) -> None:
         """Update the input border color based on the current agent mode.
 
-        Uses blue (#277dff) for planning mode, yellow (#ffe165) for code mode.
+        Uses blue (#277dff) for planning mode, yellow (#fee165) for code mode.
         """
         from textual.color import Color
 
